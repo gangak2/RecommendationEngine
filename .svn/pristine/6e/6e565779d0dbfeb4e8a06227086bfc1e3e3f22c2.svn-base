@@ -1,0 +1,959 @@
+package com.database.interaction;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import org.neo4j.cypher.javacompat.ExecutionEngine;
+import org.neo4j.cypher.javacompat.ExecutionResult;
+import org.neo4j.graphdb.GraphDatabaseService;
+import org.neo4j.graphdb.Label;
+import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.Path;
+import org.neo4j.graphdb.Relationship;
+import org.neo4j.graphdb.Transaction;
+import org.neo4j.graphdb.factory.GraphDatabaseFactory;
+import org.neo4j.graphdb.factory.GraphDatabaseSettings;
+import org.neo4j.io.fs.DefaultFileSystemAbstraction;
+import org.neo4j.kernel.StoreLocker;
+import org.neo4j.kernel.impl.util.StringLogger;
+
+public class RecommendationDBQueries {
+	/******************** Variable declarations ***************************/
+	static String DB_PATH;
+	static GraphDatabaseService GDBService;
+	static boolean isConnectionSet = false;
+	
+	static HashMap<Node,Boolean> Nodes = new HashMap<Node,Boolean>();
+	static HashMap<Link,Boolean> Links = new HashMap<Link,Boolean>();
+	static HashMap<Link,Boolean> Relationships = new HashMap<Link,Boolean>();
+	
+	static ArrayList<HashMap<String,String>> tNodes = new ArrayList<HashMap<String,String>>();
+	static ArrayList<HashMap<String,String>> tLinks = new ArrayList<HashMap<String,String>>();
+	
+	static String jsonString = "";
+	
+	static Metadata mtdt = new Metadata();
+	
+	/***************************** Default constructor ******************************/
+	public RecommendationDBQueries(){
+		
+	}
+	
+	/******************************* Acquire db connection *************************/
+	public static void DBConnection(){
+		DB_PATH = "F:\\neo4j-community-2.2.2\\bin\\moviebooksdatabasev110815.db";
+		StoreLocker lock = new StoreLocker(new DefaultFileSystemAbstraction());
+        lock.checkLock(new File(DB_PATH));
+        try {
+            lock.release();
+            GDBService = new GraphDatabaseFactory().newEmbeddedDatabaseBuilder(DB_PATH).setConfig( GraphDatabaseSettings.node_keys_indexable, "ID,SEARCHABLE" ).
+            	    setConfig( GraphDatabaseSettings.node_auto_indexing, "true" ).
+            	    setConfig( GraphDatabaseSettings.relationship_auto_indexing, "true" ).newGraphDatabase();
+        } catch (IOException e1) {
+            e1.printStackTrace();
+        }
+		
+		isConnectionSet = true;
+	}
+	
+
+	public static boolean userAuthentication(String username, String password){
+		if(!isConnectionSet)	DBConnection();
+		int count = 0;
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (u:User {username : '" + username 
+								+ "', password : '" + password
+								+ "'}) RETURN u";
+			System.out.println("CYPHER :: " + cypher);
+			ExecutionResult result = engine.execute(cypher);
+			
+			for(Map<String,Object> row : result){
+				count++;	
+			}
+			tx.success();
+			tx.close();
+		}
+		if(count == 1){
+			System.out.println("Authenticated");
+			return true;
+		}
+		return false;
+	}
+	
+	/*********************** Autocomplete suggestor ******************************/
+	public static String autoCompleteSuggestor(String filter, String prefix) throws IOException{
+		if(!isConnectionSet){
+			System.out.println("Obtaining connection......");
+			DBConnection();
+		}
+		System.out.println("Fetching suggestions for prefix " + prefix + " in " + filter);
+		String suggestions = "";
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = null;
+			if(filter.equals("ALL"))	cypher = "MATCH (m) WHERE m.SEARCHABLE =~ '(?i)"+ prefix +".*' RETURN m.ID  as id, m.SEARCHABLE as search, labels(m) as labels LIMIT 5";
+			else cypher = "MATCH (m:"+ filter +") WHERE m."+ mtdt.getsearchableproperty(filter) +" =~ '(?i)"+ prefix +".*' RETURN m."+ mtdt.getuniqueproperty(filter) +"  as id, m."+ mtdt.getsecondaryidentifier(filter) +"  as sid, m."+ mtdt.getsearchableproperty(filter) +" as search, labels(m) as labels LIMIT 5";
+			System.out.println("Running this query :: " + cypher);
+			ExecutionResult result = engine.execute(cypher);
+			suggestions = "[";
+			for(Map<String,Object> row : result){
+				suggestions += "{\"searchable\":\""+ row.get("search") + "\",\"id\":\""+ row.get("id") + "\",\"label\":\"" + row.get("labels") + "\",\"sid\":\"" + row.get("sid") + "\"},";
+			}
+			if(suggestions.endsWith(",")){
+				suggestions = suggestions.substring(0, suggestions.length()-1);
+			}
+			suggestions += "]";
+			tx.success();
+			tx.close();
+		}
+		System.out.println(suggestions);
+		return suggestions;
+	}
+	
+	/********************* Find node in the database *********************************************/
+	public static String findInDatabase(String nodefilter, String nodeid) {
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = null;
+			if(nodefilter.equals("ALL")) return getAllData();
+			else cypher = "MATCH (m:" + nodefilter + "{"+ mtdt.getuniqueproperty(nodefilter) +": '" + nodeid + "'}) RETURN m";
+			System.out.println("CYPHER ::" + cypher);
+			ExecutionResult result = engine.execute(cypher);
+			updateNodes(result);
+			writetojson();
+			tx.success();
+			tx.close();
+		}
+		return jsonString;
+	}
+	
+	/***************************Get user details ******************************************/
+	public static User getUserDetails(String id){
+		User u = new User();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (m:User {username : '"+id+"'}) RETURN m";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				Node node = (Node)row.get("m");
+				u.setId((String)node.getProperty("ID"));
+				break;
+			}
+		}
+		return u;
+	}
+	
+	/************************get user watched/read products etc *******************************/
+	public static String getUserNoOfConnections(String userid,String productlabel, String relation){
+		String count = null;
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (m:User {username : '"+userid+"'})-[:"+relation+"]-(:"+productlabel+") RETURN count(*) AS nr";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				Long nr = (Long) row.get("nr");
+				count = nr.toString();
+				break;
+			}
+		}
+		return count;
+	}
+	/************************get user watched movies list **************************************/
+	public static List<MovieResponse> getUserWatchedMoviesList(String userid){
+		List<MovieResponse> watchedMovies = new ArrayList<MovieResponse>();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (a:User {username : '"+userid+"'})-[w:watched]->(m) RETURN w,m\n";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				MovieResponse mr = new MovieResponse();
+				Node node = (Node)row.get("m");
+				Movie m = new Movie();
+				m.setId((String)node.getProperty(mtdt.getuniqueproperty("MOVIE")));
+				mr.setMovie(m);
+				Relationship rel = (Relationship)row.get("w");
+				mr.setComment((String)rel.getProperty("comment"));
+				mr.setRating((String)rel.getProperty("rating"));
+				watchedMovies.add(mr);
+			}
+		}
+		return watchedMovies;
+	}
+	
+	/************************get user connected products list **************************************/
+	public static List<String> getUserConnectedProductsList(String userid, String productlabel, String relation){
+		List<String> products = new ArrayList<String>();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (a:User {username : '"+userid+"'})-[w:"+relation+"]->(m:"+productlabel+") RETURN m."+mtdt.getuniqueproperty(productlabel)+" AS id\n";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				products.add((String)row.get("id"));
+			}
+		}
+		return products;
+	}
+	
+	/************************get user watched movies in genre list **************************************/
+	public static List<MovieResponse> getUserWatchedMoviesInGenreList(String userid, String genre){
+		List<MovieResponse> watchedMoviesGenre = new ArrayList<MovieResponse>();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (a:User {username : '"+userid+"'})-[w:watched]->(m)-[:genre]->(g:GENRE {"+mtdt.getuniqueproperty("GENRE")+":'"+genre+"'}) RETURN w,m\n";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				MovieResponse mr = new MovieResponse();
+				Node node = (Node)row.get("m");
+				Movie m = new Movie();
+				m.setId((String)node.getProperty(mtdt.getuniqueproperty("MOVIE")));
+				mr.setMovie(m);
+				Relationship rel = (Relationship)row.get("w");
+				mr.setComment((String)rel.getProperty("comment"));
+				mr.setRating((String)rel.getProperty("rating"));
+				watchedMoviesGenre.add(mr);
+			}
+		}
+		return watchedMoviesGenre;
+	}
+	
+	/************************get movies in genre list **************************************/
+	public static List<Movie> getMoviesInGenreList(String genre){
+		List<Movie> moviesGenre = new ArrayList<Movie>();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (m)-[:genre]->(g:GENRE {"+mtdt.getuniqueproperty("GENRE")+":'"+genre+"'})\n";
+			cypher	+= "WITH m\n";
+			cypher += "OPTIONAL MATCH (u)-[w:watched]->(m)\n";
+			cypher += "RETURN m,avg(toInt(w.rating)) as avgrating ORDER BY avgrating DESC\n";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				MovieResponse mr = new MovieResponse();
+				Node node = (Node)row.get("m");
+				Movie m = new Movie();
+				m.setId((String)node.getProperty(mtdt.getuniqueproperty("MOVIE")));
+				moviesGenre.add(m);
+			}
+		}
+		return moviesGenre;
+	}
+	
+	/*****************************Get movie suggestions from following circle ********************************/
+	public static List<Movie> getMovieSuggestions(String userid){
+		List<Movie> suggestions = new ArrayList<Movie>();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (g:GENRE)<-[:genre]-(m:MOVIE)<-[w:watched]-(f:User)<-[:follows]-(u:User {"+mtdt.getuniqueproperty("User")+": '"+userid+"'})\n";
+			cypher	+= "WHERE NOT((g)<-[:genre]-(m)<-[:watched]-(u))\n";
+			cypher += "RETURN m,avg(toInt(w.rating)) as a ORDER BY a DESC LIMIT 5\n";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				MovieResponse mr = new MovieResponse();
+				Node node = (Node)row.get("m");
+				Movie m = new Movie();
+				m.setId((String)node.getProperty(mtdt.getuniqueproperty("MOVIE")));
+				suggestions.add(m);
+			}
+			tx.success();
+			tx.close();
+		}
+		return suggestions;
+	}
+	
+	/*****************************Get product property **********************************************/
+	public static String getProductProperty(String productlabel, String productid, String productproperty){
+		String property = null;
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (n:"+productlabel+" {"+mtdt.getuniqueproperty(productlabel)+": '"+productid+"'})\n";
+			cypher += "RETURN n."+productproperty+" as value";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				MovieResponse mr = new MovieResponse();
+				property = (String)row.get("value");
+				break;
+			}
+			tx.success();
+			tx.close();
+		}
+		return property;
+	}
+	
+	
+	/*****************************Get movie suggestions from following circle ********************************/
+	public static List<Movie> getSuggestionsFromMovie(String userid,String movieid){
+		List<Movie> suggestions = new ArrayList<Movie>();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (n:MOVIE {movieId: '"+movieid+"'})<-[w:watched]-(f:User)-[:watched]->(m)\n";
+			cypher	+= "WHERE NOT((m)<-[:watched]-(:User {username: '"+userid+"'}))\n";
+			cypher += "RETURN m,count(w) as c ORDER BY c DESC LIMIT 5\n";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				MovieResponse mr = new MovieResponse();
+				Node node = (Node)row.get("m");
+				Movie m = new Movie();
+				m.setId((String)node.getProperty(mtdt.getuniqueproperty("MOVIE")));
+				suggestions.add(m);
+			}
+			tx.success();
+			tx.close();
+		}
+		return suggestions;
+	}
+	
+	/*****************************Get movie suggestions from following circle ********************************/
+	public static List<String> getSuggestedProductsForUser(String userid,String productlabel, String productid, String relation){
+		System.out.println(userid + "\t" + productlabel + "\t" + productid + "\t" + relation);
+		List<String> suggestions = new ArrayList<String>();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (n:"+productlabel+" {"+mtdt.getuniqueproperty(productlabel)+": '"+productid+"'})<-[w:"+relation+"]-(f:User)-[:"+relation+"]->(m:"+productlabel+")\n";
+			cypher	+= "WHERE NOT((m)<-[:"+relation+"]-(:User {"+mtdt.getuniqueproperty("User")+": '"+userid+"'}))\n";
+			cypher += "RETURN m."+mtdt.getuniqueproperty(productlabel)+" AS id,count(w) as c ORDER BY c DESC LIMIT 5\n";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				String id = (String)row.get("id");
+				suggestions.add(id);
+			}
+			tx.success();
+			tx.close();
+		}
+		return suggestions;
+	}
+	/************************ check if user is followed by active user **************************/
+	public static boolean checkfollower(String active, String user){
+		boolean followed = false;
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (a:User {username : '"+active+"'})-[f:follows]->(u:User {username : '"+user+"'}) RETURN f\n";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				followed = true;
+				break;
+			}
+			tx.success();
+			tx.close();
+		}
+		return followed;
+	}
+	
+	/**********************Get the number of ratings for a movie***************************/
+	public static String getNoOfRatings(String movieid){
+		String count = "0";
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (m:MOVIE {"+mtdt.getuniqueproperty("MOVIE")+" : '"+movieid+"'})<-[:watched]-(u:User)\n";
+			cypher += "RETURN toString(count(*)) AS c\n";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				count = (String)row.get("c");
+				break;
+			}
+			tx.success();
+			tx.close();
+		}
+		return count;
+	}
+	
+	/**********************Get the number of ratings for the product***************************/
+	public static String getProductNoOfRatings(String productlabel, String productid, String relation){
+		String count = "0";
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (m:"+productlabel+" {"+mtdt.getuniqueproperty(productlabel)+" : '"+productid+"'})<-[:"+relation+"]-(u:User)\n";
+			cypher += "RETURN toString(count(*)) AS c\n";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				count = (String)row.get("c");
+				break;
+			}
+			tx.success();
+			tx.close();
+		}
+		return count;
+	}
+	/***********************follow User ********************************************/
+	
+	public static void followUser(String active, String user){
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (a:User {username : '"+active+"'}),(u:User {username : '"+user+"'})\n";
+			cypher += "MERGE (a)-[:follows]->(u)\n";
+			System.out.println(cypher);
+			engine.execute(cypher);
+			tx.success();
+			tx.close();
+		}
+	}
+	/***********************Get user wishList ************************************************/
+	public static List<Movie> getUserWishList(String id){
+		List<Movie> wishlist = new ArrayList<Movie>(); 
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (u:User {username : '"+id+"'})-[:wishlisted]->(m)\n";
+			cypher += "WITH m\n";
+			cypher += "OPTIONAL MATCH (m)<-[w:watched]-()\n";
+			cypher += "RETURN m, avg(toFloat(w.rating)) as rating";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				Node node = (Node)row.get("m");
+				Movie m = new Movie();
+				m.setId((String)node.getProperty(mtdt.getuniqueproperty("MOVIE")));
+				wishlist.add(m);
+			}
+		}
+		return wishlist;
+	}
+	
+	/*********************Get top picks ***************************************************/
+	public static List<Movie> getTopPicks(){
+		List<Movie> topPicks = new ArrayList<Movie>();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (m)<-[w:watched]-(u)\n";
+			cypher += "RETURN m,avg(toInt(w.rating)) as avgrating, toString(count(w)) as voteCount ORDER BY avgrating DESC LIMIT 10";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				Node node = (Node)row.get("m");
+				Movie m = new Movie();
+				m.setId((String)node.getProperty(mtdt.getuniqueproperty("MOVIE")));
+				topPicks.add(m);
+			}
+		}
+		return topPicks;
+	}
+	
+	/***************************Get genre wise movies list *********************************/
+	public static List<Genre> getGenreWiseMoviesList(){
+		List<Genre> genreList = new ArrayList<Genre>();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (g:GENRE)\n";
+			cypher += "WITH g\n";
+			cypher += "OPTIONAL MATCH (g)<-[:genre]-(m)\n";
+			cypher += "RETURN g,toString(count(m)) as num ORDER BY g.genre\n";
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				Node node = (Node)row.get("g");
+				Genre g = new Genre();
+				g.setGenre((String)node.getProperty("genre"));
+				g.setMovieCount((String)row.get("num"));
+				genreList.add(g);
+			}
+		}
+		return genreList;
+	}
+	/********************* Get user followersList *********************************************/
+	public static List<User> getUserFollowersList(String id){
+		List<User> followerslist = new ArrayList<User>(); 
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (u:User {username : '"+id+"'})<-[:follows]-(f)";
+			cypher += "WITH f\n";
+			cypher += "OPTIONAL MATCH (f)-[w:watched]->(m)\n";
+			cypher += "RETURN f, toString(count(m)) AS movies";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				Node node = (Node)row.get("f");
+				User u = new User();
+				u.setId((String)node.getProperty("ID"));
+				followerslist.add(u);
+			}
+		}
+		return followerslist;
+	}
+	
+	/********************* Get user followersList *********************************************/
+	public static List<User> getUserFollowingList(String id){
+		List<User> followinglist = new ArrayList<User>(); 
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (u:User {username : '"+id+"'})-[:follows]->(f)";
+			cypher += "WITH f\n";
+			cypher += "OPTIONAL MATCH (f)-[w:watched]->(m)\n";
+			cypher += "RETURN f, toString(count(m)) AS movies";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				Node node = (Node)row.get("f");
+				User u = new User();
+				u.setId((String)node.getProperty("ID"));
+				followinglist.add(u);
+			}
+		}
+		return followinglist;
+	}
+	
+	/*********************** Update properties *******************************************/
+	public static void updateProperty(String label, String id, String property, String value){
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (n:"+label+" {ID : '"+id+"'}) SET n."+property+" = '"+value+"'\n";
+			engine.execute(cypher);
+			tx.success();
+			tx.close();
+			System.out.println(property + " for " + label + " " + id + " updated to " + value);
+		}
+	}
+	
+	/*********************************Movie average rating ************************************/
+	public static double getProductAvgRating(String productlabel, String productid, String relation){
+		double avgRating=0;
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (m:"+productlabel+" {"+mtdt.getuniqueproperty(productlabel)+":'"+productid+"'})<-[w:"+relation+"]-(u)\n";
+			cypher += "RETURN avg(toInt(w.rating)) as avgrating";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				avgRating = row.get("avgrating")==null?0:(double)row.get("avgrating");
+				break;
+			}
+		}
+		avgRating = Math.round(avgRating * 100.0) / 100.0;
+		return avgRating;
+	}
+	
+	/*********************************Movie average rating ************************************/
+	public static double getMovieAvgRating(String id){
+		double avgRating=0;
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (m:MOVIE {"+mtdt.getuniqueproperty("MOVIE")+":'"+id+"'})<-[w:watched]-(u)\n";
+			cypher += "RETURN avg(toInt(w.rating)) as avgrating";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				avgRating = row.get("avgrating")==null?0:(double)row.get("avgrating");
+				break;
+			}
+		}
+		avgRating = Math.round(avgRating * 100.0) / 100.0;
+		return avgRating;
+	}
+	
+	/***************************Get product details ******************************************/
+	public static Movie getProductDetails(String id){
+		Movie m = new Movie();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			//Fetch user details
+			String cypher = "MATCH (m:MOVIE {"+ mtdt.getuniqueproperty("MOVIE")+" : '"+id+"'}) RETURN m";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				Node node = (Node)row.get("m");
+				m.setId((String)node.getProperty(mtdt.getuniqueproperty("MOVIE")));
+				break;
+			}
+			cypher = "MATCH (m:MOVIE {"+ mtdt.getuniqueproperty("MOVIE")+" : '"+id+"'})<-[w:watched]-() RETURN avg(toFloat(w.rating)) AS avgr";
+			System.out.println(cypher);
+			result = engine.execute(cypher);
+			double nr = 0;
+			for(Map<String,Object> row : result){
+				nr = row.get("avgr")==null?0:(double)row.get("avgr");
+				break;
+			}
+			tx.success();
+			tx.close();
+		}
+		return m;
+	}
+	
+	/********************* Get friends response to the product *********************************/
+	public static List<MovieResponse> getResponseFromTheFollowingCircle(String userid, String movieid){
+		List<MovieResponse> response = new ArrayList<MovieResponse>();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (u:User {ID : '"+userid+"'})-[:follows]->(f)-[w:watched]->(m:MOVIE {"+mtdt.getuniqueproperty("MOVIE")+": '"+movieid+"'}) RETURN f,m,w\n";
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				MovieResponse mr = new MovieResponse();
+				Node node = (Node)row.get("f");
+				User following = new User();
+				following.setId((String)node.getProperty("ID"));
+				mr.setUser(following);
+				Relationship rel = (Relationship)row.get("w");
+				mr.setComment((String)rel.getProperty("comment"));
+				mr.setRating((String)rel.getProperty("rating"));
+				response.add(mr);
+			}
+			tx.success();
+			tx.close();
+		}
+		return response;
+	}
+	
+	/********************* Get friends response to the product *********************************/
+	public static List<ProductResponse> getProductResponseFromTheFollowingCircle(String userid, String productlabel, String productid, String relation){
+		List<ProductResponse> response = new ArrayList<ProductResponse>();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (u:User {ID : '"+userid+"'})-[:follows]->(f)-[w:"+relation+"]->(m:"+productlabel+" {"+mtdt.getuniqueproperty(productlabel)+": '"+productid+"'}) RETURN f,m,w\n";
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				ProductResponse pr = new ProductResponse();
+				Node node = (Node)row.get("f");
+				User following = new User();
+				following.setId((String)node.getProperty("ID"));
+				pr.setUser(following);
+				Relationship rel = (Relationship)row.get("w");
+				pr.setComment((String)rel.getProperty("comment"));
+				pr.setRating((String)rel.getProperty("rating"));
+				response.add(pr);
+			}
+			tx.success();
+			tx.close();
+		}
+		return response;
+	}
+	
+	/********************* Get user's response to the product *********************************/
+	public static MovieResponse getUserResponse(String userid, String movieid){
+		MovieResponse mr = new MovieResponse();
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (u:User {ID : '"+userid+"'})-[w:watched]->(m:MOVIE {"+mtdt.getuniqueproperty("MOVIE")+": '"+movieid+"'}) RETURN w.comment AS comment, w.rating AS rating\n";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				mr.hasWatched();
+				mr.setComment((String)row.get("comment"));
+				mr.setRating((String)row.get("rating"));
+				break;
+			}
+			if(!mr.didWatch()){
+				cypher = "MATCH (u:User {ID : '"+userid+"'})-[w:wishlisted]->(m:MOVIE {"+mtdt.getuniqueproperty("MOVIE")+": '"+movieid+"'}) RETURN w\n";
+				result = engine.execute(cypher);
+				for(Map<String,Object> row : result){
+					mr.hasWishlisted();
+					break;
+				}
+			}
+			tx.success();
+			tx.close();
+		}
+		return mr;
+	}
+	
+	/********************* Get user's response to the product *********************************/
+	public static ProductResponse getUserResponseToProduct(String userid, String productlabel, String productid, String relation){
+		ProductResponse pr = new ProductResponse();
+		User u = new User(userid);
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (u:User {ID : '"+userid+"'})-[w:"+relation+"]->(m:"+productlabel+" {"+mtdt.getuniqueproperty(productlabel)+": '"+productid+"'}) RETURN w.comment AS comment, w.rating AS rating\n";
+			System.out.println(cypher);
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				pr.setUser(u);
+				pr.setComment((String)row.get("comment"));
+				pr.setRating((String)row.get("rating"));
+				break;
+			}
+			tx.success();
+			tx.close();
+		}
+		return pr;
+	}
+	
+	/*********************** Update product response *******************************************/
+	public static void updateProductResponse(String userid, String label, String id, String property, String value, String relation){
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (u:User {username:'"+userid+"'}),(m:"+label+" {"+mtdt.getuniqueproperty(label)+": '"+id+"'})\n";
+			cypher += "MERGE (u)-[w:"+relation+"]->(m)\n";
+			cypher += "SET w."+property+"='"+value+"'\n";
+			engine.execute(cypher);
+			tx.success();
+			tx.close();
+			System.out.println("product response has been updated");
+		}
+	}
+	
+	/************************Update user's interest in the product*******************************/
+	public static void updateProductInterest(String userid, String productlabel, String productid){
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (u:User {username:'"+userid+"'}),(m:"+productlabel+" {"+mtdt.getuniqueproperty(productlabel)+": '"+productid+"'})\n";
+			cypher += "MERGE (u)-[w:wishlisted]->(m)\n";
+			System.out.println(cypher);
+			engine.execute(cypher);
+			tx.success();
+			tx.close();
+			System.out.println("product interest has been updated");
+		}
+	}
+	
+	/************************Check if the connection exists****************************/
+	public static boolean checkConnectionExistence(String userid, String productlabel, String productid, String relation){
+		boolean ret = false;
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (u:User {username:'"+userid+"'})-[r:"+relation+"]->(m:"+productlabel+" {"+mtdt.getuniqueproperty(productlabel)+": '"+productid+"'})\n";
+			cypher += "RETURN count(*) AS c\n";
+			ExecutionResult result = engine.execute(cypher);
+			for(Map<String,Object> row : result){
+				Long count = (Long)row.get("c");
+				if(count == 1){
+					ret = true;
+				}
+				break;
+			}
+			tx.success();
+			tx.close();
+		}
+		return ret;
+	}
+	/********************* Update the database *********************************************/
+	public static String updateDatabase(String user, String movie, String status, String comment, String rating) {
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH (m:MOVIE {movieId:"+movie+"}),(u:User{UserId:"+user+"})\n";
+			cypher += "MERGE (u)-[:"+status+"{rated:"+rating+"}]->(m)\n";
+			cypher += "MERGE (u)-[:Commented{comment:"+comment+"}]->(m)\n";
+			ExecutionResult result = engine.execute(cypher);
+			tx.success();
+			tx.close();
+		}
+		return jsonString;
+	}
+	
+	/*************************Get all the data from the database ****************************************/
+	public static String getAllData() {
+		if(!isConnectionSet){
+			DBConnection();
+		}
+		try(Transaction tx = GDBService.beginTx()){
+			ExecutionEngine engine = new ExecutionEngine(GDBService,StringLogger.SYSTEM);
+			String cypher = "MATCH p=(start)-[]-(end) RETURN p LIMIT 500";
+			ExecutionResult result = engine.execute(cypher);
+			Nodes.clear();
+			Links.clear();
+			System.out.println("executed");
+			Iterator parentrels = result.columnAs("p");
+			while(parentrels.hasNext()){
+				Path path = (Path) parentrels.next();
+	            Iterable<Relationship>  relationships = path.relationships();
+	            java.util.Iterator<Relationship> relIterator = relationships.iterator();
+	            while (relIterator.hasNext()){
+	                Relationship rel = relIterator.next();
+	                Node aNode = (Node) rel.getStartNode();
+	                mergeNode(aNode);
+	                Node zNode = (Node) rel.getEndNode();
+	                mergeNode(zNode);
+	                String type = rel.getType().name();
+	                mergeLink(new Link((String)aNode.getProperty("ID"),(String)zNode.getProperty("ID"),type,100));
+	            }
+			}
+			writetojson();
+			tx.success();
+			tx.close();
+		}
+		return jsonString;
+	}
+	
+	private static void updateNodes(ExecutionResult result){
+		Nodes.clear();
+		Links.clear();
+		for(Map<String,Object> row : result){
+			Node node = (Node)row.get("m");
+			Nodes.put(node,true);
+		}
+	}
+	
+	public static void mergeNode(Node n){
+		Nodes.put(n, true);
+	}
+	
+	public static void mergeLink(Link l){
+		Links.put(l, true);
+	}
+	
+	public static void writetojson(){
+		jsonString = "{\\\"nodes\\\":[";
+		boolean isfirstnode = true;
+		for(Node n : Nodes.keySet()){
+			String label = null;
+			for(Label lbl : n.getLabels()){
+				label = lbl.name();
+				break;
+			}
+			if(isfirstnode){
+				jsonString += "{";
+				isfirstnode = false;
+			}
+			else{
+				jsonString += ",{";
+			}
+			//get the properties
+			boolean isfirst = true;
+			jsonString += "\\\"ID\\\":"+"\\\""+n.getProperty(mtdt.getuniqueproperty(label))+"\\\"";
+			jsonString += ",\\\"DISPLAY\\\":"+"\\\""+n.getProperty(mtdt.getdisplayproperty(label))+"\\\"";
+			jsonString += ",\\\"LABEL\\\":"+"\\\""+label+"\\\"";
+			/*for(String prop : n.getPropertyKeys()){
+            	if(isfirst){
+            		jsonString += "\\\""+prop+"\\\":"+"\\\""+n.getProperty(prop)+"\\\"";
+            		isfirst=false;
+            	}
+            	else{
+            		jsonString += ",\\\""+prop+"\\\":"+"\\\""+n.getProperty(prop)+"\\\"";
+            	}
+            }*/
+			//if(MyNodes.indexOf(n) != -1)	jsonString += ",\\\"Iamconnected\\\":"+"\\\"yes\\\"";
+			//if(MySuggestions.indexOf(n) != -1)	jsonString += ",\\\"Suggestion\\\":"+"\\\"yes\\\"";
+			jsonString += "}";
+		}
+		jsonString += "],\\\"links\\\":[";
+		boolean isfirstlink = true;
+		//for(int i=0;i<Links.size();i++){
+		for(Link l: Links.keySet()){
+			if(isfirstlink){
+				jsonString += "{";
+				isfirstlink = false;
+			}
+			else{
+				jsonString += ",{";
+			}
+			jsonString += "\\\"from\\\": \\\"" + l.from + "\\\",\\\"to\\\": \\\"" + l.to + "\\\",\\\"type\\\": \\\"" + l.linktype +"\\\",\\\"length\\\": " + l.linkDistance + "}";
+		}
+		jsonString += "]}";
+		//System.out.println(jsonString);
+	}
+
+
+}

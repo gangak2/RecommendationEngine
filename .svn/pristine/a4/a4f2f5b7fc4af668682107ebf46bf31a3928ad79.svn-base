@@ -1,0 +1,63 @@
+package com.database.interaction;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class Movie {
+	String id = null;
+	String title = null;
+	String releaseyear = null;
+	double avgrating = 0;
+	String noofratings = null;
+	String genre = null;
+	
+	public Movie(){
+		
+	}
+	
+	public Movie(String id){
+		this.id = id;
+	}
+	
+	public void setId(String x){
+		this.id = x;
+	}
+	
+	public String getid(){
+		return this.id;
+	}
+	
+	public String getTitle(){
+		return RecommendationDBQueries.getProductProperty("MOVIE", this.id, "title");
+	}
+	//movieId:ID(MOVIE),title,year,genres
+	public String getGenre(){
+		return RecommendationDBQueries.getProductProperty("MOVIE", this.id, "genres");
+	}
+	
+	public String getReleaseYear(){
+		return RecommendationDBQueries.getProductProperty("MOVIE", this.id, "year");
+	}
+	
+	public String getAvgRating(){
+		return Double.toString(RecommendationDBQueries.getProductAvgRating("MOVIE", this.id, "watched"));
+	}
+	
+	public String getNoOfRatings(){
+		return RecommendationDBQueries.getProductNoOfRatings("MOVIE", this.id, "watched");
+	}
+	
+	public List<Movie> getSuggestedMovies(String userid){
+		List<String> productList = RecommendationDBQueries.getSuggestedProductsForUser(userid, "MOVIE", this.id, "watched");
+		List<Movie> movieList = new ArrayList<Movie>();
+		for(String id: productList){
+			Movie m = new Movie(id);
+			movieList.add(m);
+		}
+		return movieList;
+	}
+	
+	public ProductResponse getUserResponse(String userid){
+		return RecommendationDBQueries.getUserResponseToProduct(userid, "MOVIE", this.id, "watched");
+	}
+}

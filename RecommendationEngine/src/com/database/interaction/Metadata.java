@@ -1,0 +1,88 @@
+package com.database.interaction;
+
+import java.util.HashMap;
+
+public class Metadata {
+	static HashMap<String,HashMap<String,String>> datamap = new HashMap<String,HashMap<String,String>>();
+	
+	public Metadata(){
+		//Metadata corresponding to Product(Movie) node
+		HashMap<String,String> movie = new HashMap<String,String>();
+		movie.put("ID", "IMDB_ID");
+		movie.put("sID", "Year");
+		movie.put("DISPLAY", "Title");
+		movie.put("SEARCHABLE", "Title");
+		
+		datamap.put("MOVIE", movie);
+		
+		//Metadata corresponding to User node
+		HashMap<String,String> user = new HashMap<String,String>();
+		user.put("ID", "ID");
+		user.put("sID", "ID");
+		user.put("SEARCHABLE", "searchable");
+		user.put("DISPLAY", "searchable");
+		
+		datamap.put("User", user);
+		
+		//Metadata corresponding to Genre node
+		HashMap<String,String> genre = new HashMap<String,String>();
+		//genre.put("ID", "genre_id");
+		genre.put("ID", "genre");
+		//genre.put("SEARCHABLE", "searchable");
+		//genre.put("DISPLAY", "searchable");
+		
+		datamap.put("GENRE", genre);
+		
+		//Metadata corresponding to Genre node
+		HashMap<String,String> book = new HashMap<String,String>();
+		book.put("ID", "ISBN");
+		book.put("sID", "author");
+		book.put("SEARCHABLE", "title");
+		book.put("DISPLAY", "title");
+		
+		datamap.put("BOOK", book);
+		
+		//Metadata corresponding to Actro node
+		HashMap<String,String> actor = new HashMap<String,String>();
+		actor.put("ID", "actorID");
+		actor.put("sID", "Name");
+		actor.put("SEARCHABLE", "Name");
+		actor.put("DISPLAY", "Name");
+		
+		datamap.put("ACTOR", actor);
+		
+		//Metadata corresponding to Actro node
+		HashMap<String,String> language = new HashMap<String,String>();
+		language.put("ID", "Language_id");
+		language.put("sID", "Language");
+		language.put("SEARCHABLE", "Language");
+		language.put("DISPLAY", "Language");
+		
+		datamap.put("LANGUAGE", language);
+		
+		//Metadata corresponding to Tag node
+		HashMap<String,String> tag = new HashMap<String,String>();
+		tag.put("ID", "tag");
+		tag.put("sID", "tag");
+		tag.put("DISPLAY", "tag");
+		tag.put("SEARCHABLE", "tag");
+		
+		datamap.put("TAG", tag);
+	}
+	
+	public String getsearchableproperty(String nodetype){
+		return datamap.get(nodetype).get("SEARCHABLE");
+	}
+	
+	public String getuniqueproperty(String nodetype){
+		return datamap.get(nodetype).get("ID");
+	}
+	
+	public String getdisplayproperty(String nodetype){
+		return datamap.get(nodetype).get("DISPLAY");
+	}
+	
+	public String getsecondaryidentifier(String nodetype){
+		return datamap.get(nodetype).get("sID");
+	}
+}

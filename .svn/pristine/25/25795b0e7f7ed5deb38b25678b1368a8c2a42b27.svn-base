@@ -1,0 +1,86 @@
+package com.database.interaction;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class User {
+	String id = null;
+	String firstname = null;
+	String lastname = null;
+	String ratings = null;
+	
+	public User(String x){
+		this.id = x;
+	}
+	
+	public User(){
+	}
+	
+	public void setId(String x){
+		this.id = x;
+	}
+	
+	public String getfirstname(){
+		return RecommendationDBQueries.getProductProperty("User", this.id, "firstname");
+	}
+	
+	public String getid(){
+		return this.id;
+	}
+	
+	public String getlastname(){
+		return RecommendationDBQueries.getProductProperty("User", this.id, "lastname");
+	}
+	
+	public String getNoOfConnections(String productlabel, String relation){
+		return RecommendationDBQueries.getUserNoOfConnections(this.id, productlabel, relation);
+	}
+	
+	public boolean checkIfFollowed(String active){
+		return RecommendationDBQueries.checkfollower(active, this.id);
+	}
+	
+	public List<Movie> getSuggestionsFromFollowingCircle(){
+		return RecommendationDBQueries.getMovieSuggestions(this.id);
+	}
+	
+	public List<Movie> getAllWatchedMovies(){
+		List<String> productList = RecommendationDBQueries.getUserConnectedProductsList(this.id, "MOVIE", "watched");
+		List<Movie> movieList = new ArrayList<Movie>();
+		for(String id: productList){
+			Movie m = new Movie(id);
+			movieList.add(m);
+		}
+		return movieList;
+	}
+	
+	public List<Movie> getAllWishlistedMovies(){
+		List<String> productList = RecommendationDBQueries.getUserConnectedProductsList(this.id, "MOVIE", "wishlisted");
+		List<Movie> movieList = new ArrayList<Movie>();
+		for(String id: productList){
+			Movie m = new Movie(id);
+			movieList.add(m);
+		}
+		return movieList;
+	}
+	
+	public List<Book> getAllReadBooks(){
+		List<String> productList = RecommendationDBQueries.getUserConnectedProductsList(this.id, "BOOK", "read");
+		List<Book> bookList = new ArrayList<Book>();
+		for(String id: productList){
+			Book m = new Book(id);
+			bookList.add(m);
+		}
+		return bookList;
+	}
+	
+	public List<Book> getAllWishlistedBooks(){
+		List<String> productList = RecommendationDBQueries.getUserConnectedProductsList(this.id, "BOOK", "wishlisted");
+		List<Book> bookList = new ArrayList<Book>();
+		for(String id: productList){
+			Book m = new Book(id);
+			bookList.add(m);
+		}
+		return bookList;
+	}
+}

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><project-modules id="moduleCoreId" project-version="1.5.0">
+    <wb-module deploy-name="RecommendationEngine">
+        <wb-resource deploy-path="/" source-path="/WebContent" tag="defaultRootSource"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/src"/>
+        <dependent-module archiveName="neo4j-unsafe-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-unsafe-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-graph-algo-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-graph-algo-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="scala-library-2.10.5.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/scala-library-2.10.5.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-import-tool-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-import-tool-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="parboiled-scala_2.10-1.1.7.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/parboiled-scala_2.10-1.1.7.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-cypher-compiler-2.2-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-cypher-compiler-2.2-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="opencsv-2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/opencsv-2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-lucene-index-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-lucene-index-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-graph-matching-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-graph-matching-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-io-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-io-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-cypher-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-cypher-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-kernel-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-kernel-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="org.apache.servicemix.bundles.jline-0.9.94_1.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/org.apache.servicemix.bundles.jline-0.9.94_1.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-cypher-compiler-2.0-2.0.4.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-cypher-compiler-2.0-2.0.4.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-jmx-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-jmx-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="server-api-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/server-api-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="lucene-core-3.6.2.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/lucene-core-3.6.2.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-consistency-check-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-consistency-check-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="concurrentlinkedhashmap-lru-1.4.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/concurrentlinkedhashmap-lru-1.4.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-cypher-compiler-2.1-2.1.8.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-cypher-compiler-2.1-2.1.8.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-shell-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-shell-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-csv-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-csv-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="parboiled-core-1.1.7.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/parboiled-core-1.1.7.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-cypher-compiler-1.9-2.0.4.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-cypher-compiler-1.9-2.0.4.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-udc-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-udc-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="neo4j-primitive-collections-2.2.3.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/neo4j-community-2.2.3-windows/neo4j-community-2.2.3/lib/neo4j-primitive-collections-2.2.3.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="gson-2.3-sources.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/C:/Users/tulika.mithal/Desktop/gson-2.3-sources.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <property name="context-root" value="Recommendation_Engine"/>
+        <property name="java-output-path" value="/RecommendationEngine/build/classes"/>
+    </wb-module>
+</project-modules>
